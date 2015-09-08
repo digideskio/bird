@@ -64,7 +64,12 @@ struct bgp_config {
   struct rtable_config *igp_table;	/* Table used for recursive next hop lookups */
   int check_link;			/* Use iface link state for liveness detection */
   int bfd;				/* Use BFD for liveness detection */
+  int role;             /* Role of external connection (0 - not defined, 1 - p2p, 2 - c2p, 3 - p2c) */
 };
+
+#define ROLE_PEER 1
+#define ROLE_PROV 2
+#define ROLE_CUST 3
 
 #define MLL_SELF 1
 #define MLL_DROP 2
@@ -297,6 +302,7 @@ void bgp_log_error(struct bgp_proto *p, u8 class, char *msg, unsigned code, unsi
 #define BA_EXT_COMMUNITY	0x10	/* [RFC4360] */
 #define BA_AS4_PATH             0x11    /* [RFC4893] */
 #define BA_AS4_AGGREGATOR       0x12
+#define BA_LOCAL_ANNOUNCE        0x13    /* Ability to announce path to IX and ISP */
 
 /* BGP connection states */
 

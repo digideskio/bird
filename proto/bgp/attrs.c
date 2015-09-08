@@ -9,6 +9,7 @@
 #undef LOCAL_DEBUG
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "nest/bird.h"
 #include "nest/iface.h"
@@ -225,7 +226,7 @@ static int
 bgp_check_aggregator(struct bgp_proto *p, byte *a UNUSED, int len)
 {
   int exp_len = p->as4_session ? 8 : 6;
-  
+
   return (len == exp_len) ? 0 : WITHDRAW;
 }
 
@@ -310,7 +311,7 @@ static struct attr_desc bgp_attr_table[] = {
   { "originator_id", 4, BAF_OPTIONAL, EAF_TYPE_ROUTER_ID, 0,			/* BA_ORIGINATOR_ID */
     NULL, NULL },
   { "cluster_list", -1, BAF_OPTIONAL, EAF_TYPE_INT_SET, 0,			/* BA_CLUSTER_LIST */
-    bgp_check_cluster_list, bgp_format_cluster_list }, 
+    bgp_check_cluster_list, bgp_format_cluster_list },
   { .name = NULL },								/* BA_DPA */
   { .name = NULL },								/* BA_ADVERTISER */
   { .name = NULL },								/* BA_RCID_PATH */
@@ -323,6 +324,8 @@ static struct attr_desc bgp_attr_table[] = {
   { "as4_path", -1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_OPAQUE, 1,		/* BA_AS4_PATH */
     NULL, NULL },
   { "as4_aggregator", -1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_OPAQUE, 1,	/* BA_AS4_PATH */
+    NULL, NULL },
+  { "local_announce", 1, BAF_OPTIONAL, EAF_TYPE_INT, 1,                          /* BA_LOCAL_ANNOUNCE */
     NULL, NULL }
 };
 
@@ -412,7 +415,7 @@ aggregator_convert_to_old(struct adata *aggr, byte *dst, int *new_used)
   *new_used = 0;
 
   u32 as = get_u32(src);
-  if (as > 0xFFFF) 
+  if (as > 0xFFFF)
     {
       as = AS_TRANS;
       *new_used = 1;
@@ -455,7 +458,7 @@ bgp_get_attr_len(eattr *a)
       ASSERT((a->type & EAF_TYPE_MASK) == EAF_TYPE_OPAQUE);
       len = a->u.ptr->length;
     }
-  
+
   return len;
 }
 
@@ -492,8 +495,11 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
 	continue;
 #endif
 
+      if ((code == BA_LOCAL_ANNOUNCE) && (!p->is_internal))
+	continue;
+
       /* When AS4-aware BGP speaker is talking to non-AS4-aware BGP speaker,
-       * we have to convert our 4B AS_PATH to 2B AS_PATH and send our AS_PATH 
+       * we have to convert our 4B AS_PATH to 2B AS_PATH and send our AS_PATH
        * as optional AS4_PATH attribute.
        */
       if ((code == BA_AS_PATH) && (! p->as4_session))
@@ -506,7 +512,7 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
 	  /* Using temporary buffer because don't know a length of created attr
 	   * and therefore a length of a header. Perhaps i should better always
 	   * use BAF_EXT_LEN. */
-	  
+
 	  byte buf[len];
 	  int new_used;
 	  int nl = as_path_convert_to_old(a->u.ptr, buf, &new_used);
@@ -523,7 +529,7 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
 	  if (remains < (len + 4))
 	    goto err_no_buffer;
 
-	  /* We should discard AS_CONFED_SEQUENCE or AS_CONFED_SET path segments 
+	  /* We should discard AS_CONFED_SEQUENCE or AS_CONFED_SET path segments
 	   * here but we don't support confederations and such paths we already
 	   * discarded in bgp_check_as_path().
 	   */
@@ -572,9 +578,9 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
       flags = a->flags & (BAF_OPTIONAL | BAF_TRANSITIVE | BAF_PARTIAL);
       len = bgp_get_attr_len(a);
 
-      /* Skip empty sets */ 
+      /* Skip empty sets */
       if (((type == EAF_TYPE_INT_SET) || (type == EAF_TYPE_EC_SET)) && (len == 0))
-	continue; 
+	continue;
 
       if (remains < len + 4)
 	goto err_no_buffer;
@@ -668,7 +674,7 @@ bgp_normalize_ec_set(struct adata *ad, u32 *src, int internal)
 	{
 	  if (src[i] & EC_TBIT)
 	    continue;
-	  
+
 	  *t++ = src[i];
 	  *t++ = src[i+1];
 	}
@@ -1045,7 +1051,7 @@ static int
 bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *pool, int rr)
 {
   eattr *a;
-
+ 	
   if (!p->is_internal && !p->rs_client)
     {
       bgp_path_prepend(e, attrs, pool, p->local_as);
@@ -1066,7 +1072,7 @@ bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
    * Note that same-iface-check uses iface from route, which is based on gw.
    */
   a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_NEXT_HOP));
-  if (a && !p->cf->next_hop_self && 
+  if (a && !p->cf->next_hop_self &&
       (p->cf->next_hop_keep ||
        (p->is_internal && ipa_nonzero(*((ip_addr *) a->u.ptr->data))) ||
        (p->neigh && (e->attrs->iface == p->neigh->iface))))
@@ -1148,6 +1154,11 @@ bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *
       if (p->cf->interpret_communities && bgp_community_filter(p, e))
 	return -1;
 
+      /* Add default filter by role and attribute */
+      if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) &&
+           ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE)))
+	return -1;
+	
       if (p->local_as == new_bgp->local_as && p->is_internal && new_bgp->is_internal)
 	{
 	  /* Redistribution of internal routes with IBGP */
@@ -1179,7 +1190,7 @@ bgp_get_neighbor(rte *r)
 static inline int
 rte_resolvable(rte *rt)
 {
-  int rd = rt->attrs->dest;  
+  int rd = rt->attrs->dest;
   return (rd == RTD_ROUTER) || (rd == RTD_DEVICE) || (rd == RTD_MULTIPATH);
 }
 
@@ -1356,7 +1367,7 @@ bgp_rte_recalculate(rtable *table, net *net, rte *new, rte *old, rte *old_best)
    * that this fn is not called for them.
    *
    * The idea is simple, the implementation is more problematic,
-   * mostly because of optimizations in rte_recalculate() that 
+   * mostly because of optimizations in rte_recalculate() that
    * avoids full recalculation in most cases.
    *
    * We can assume that at least one of new, old is non-NULL and both
@@ -1375,7 +1386,7 @@ bgp_rte_recalculate(rtable *table, net *net, rte *new, rte *old, rte *old_best)
       return i1 || i2;
     }
 
-  /* 
+  /*
    * We could find the best-in-group and then make some shortcuts like
    * in rte_recalculate, but as we would have to walk through all
    * net->routes just to find it, it is probably not worth. So we
@@ -1683,7 +1694,7 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, unsigned int len, struct lin
 	    { errcode = 2; goto err; }
 	  type = EAF_TYPE_OPAQUE;
 	}
-      
+
       // Only OPTIONAL and TRANSITIVE attributes may have non-zero PARTIAL flag
       // if (!((flags & BAF_OPTIONAL) && (flags & BAF_TRANSITIVE)) && (flags & BAF_PARTIAL))
       //   { errcode = 4; goto err; }
@@ -1765,7 +1776,7 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, unsigned int len, struct lin
   if (bgp_as_path_loopy(bgp, a))
     goto withdraw;
 
-  /* Two checks for IBGP loops caused by route reflection, RFC 4456 */ 
+  /* Two checks for IBGP loops caused by route reflection, RFC 4456 */
   if (bgp_originator_id_loopy(bgp, a) ||
       bgp_cluster_list_loopy(bgp, a))
     goto withdraw;
@@ -1773,6 +1784,12 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, unsigned int len, struct lin
   /* If there's no local preference, define one */
   if (!(seen[0] & (1 << BA_LOCAL_PREF)))
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
+
+  /* Add local announce */
+  if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV) 
+    if (!(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE))))
+	   bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_ANNOUNCE, 0);
+    	
 
   return a;
 
