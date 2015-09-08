@@ -1338,6 +1338,9 @@ bgp_check_config(struct bgp_config *c)
 
   if (c->secondary && !c->c.table->sorted)
     cf_error("BGP with secondary option requires sorted table");
+
+  if (internal && (c->role==ROLE_PEER || c->role==ROLE_CUST || c->role==ROLE_PROV))
+    cf_error("Role peer, customer and provider may be set only on external connection");
 }
 
 static int
@@ -1534,9 +1537,17 @@ bgp_show_proto_info(struct proto *P)
 	      (c->peer_add_path & ADD_PATH_RX) ? " add-path-rx" : "",
 	      (c->peer_add_path & ADD_PATH_TX) ? " add-path-tx" : "",
 	      c->peer_ext_messages_support ? " ext-messages" : "");
-      cli_msg(-1006, "    Session:          %s%s%s%s%s%s%s%s",
+      char *role_name = NULL;
+      switch (p->cf->role) {
+	case ROLE_PEER: role_name = "peer"; break;
+	case ROLE_CUST: role_name = "cust"; break;
+	case ROLE_PROV: role_name = "prov"; break;
+	default:       role_name = "und"; break;
+      }
+      cli_msg(-1006, "    Session:          %s%s%s%s%s%s%s%s%s",
 	      p->is_internal ? "internal" : "external",
 	      p->cf->multihop ? " multihop" : "",
+	      " role=", role_name,
 	      p->rr_client ? " route-reflector" : "",
 	      p->rs_client ? " route-server" : "",
 	      p->as4_session ? " AS4" : "",
