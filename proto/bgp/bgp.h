@@ -65,12 +65,14 @@ struct bgp_config {
   struct rtable_config *igp_table;	/* Table used for recursive next hop lookups */
   int check_link;			/* Use iface link state for liveness detection */
   int bfd;				/* Use BFD for liveness detection */
-  int role;             /* Role of external connection (0 - not defined, 1 - p2p, 2 - c2p, 3 - p2c) */
+  int role;            			/* Neighboor role of (i|e)bgp connection */
+  int strict_mode;     			/* Are there conditions on role are set? */
 };
 
 #define ROLE_PEER 1
 #define ROLE_PROV 2
 #define ROLE_CUST 3
+#define ROLE_INTE 4
 
 #define MLL_SELF 1
 #define MLL_DROP 2

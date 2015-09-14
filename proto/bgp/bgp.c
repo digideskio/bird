@@ -1341,6 +1341,12 @@ bgp_check_config(struct bgp_config *c)
 
   if (internal && (c->role==ROLE_PEER || c->role==ROLE_CUST || c->role==ROLE_PROV))
     cf_error("Role peer, customer and provider may be set only on external connection");
+
+  if (!internal && (c->role==ROLE_INTE))
+    cf_error("Internal role may by set only on internal connection");
+ 
+  if (c->strict_mode && (c->role==0))
+    cf_error("Role must be set while using strict_mode");
 }
 
 static int
