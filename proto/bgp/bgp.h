@@ -69,6 +69,8 @@ struct bgp_config {
   int strict_mode;     			/* Are there conditions on role are set? */
 };
 
+#define BGP_STRICT_MODE 37
+
 #define ROLE_PEER 1
 #define ROLE_PROV 2
 #define ROLE_CUST 3

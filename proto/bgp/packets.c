@@ -246,15 +246,23 @@ bgp_create_open(struct bgp_conn *conn, byte *buf)
   put_u16(buf+3, p->cf->hold_time);
   put_u32(buf+5, p->local_id);
 
+  int add_len = 0;
+  if (p->cf->strict_mode) {
+    add_len = 6;
+    buf[10] = BGP_STRICT_MODE; /*random number for such option */
+    buf[11] = 4;
+    put_u32(buf+12, p->cf->role);
+  }
+
   if (conn->start_state == BSS_CONNECT_NOCAP)
     {
       BGP_TRACE(D_PACKETS, "Skipping capabilities");
-      buf[9] = 0;
-      return buf + 10;
+      buf[9] = add_len;
+      return buf + 10 + add_len;
     }
 
-  /* Skipped 3 B for length field and Capabilities parameter header */
-  cap = buf + 12;
+  /* Skipped 3 B + add_len for length field and Capabilities parameter header */
+  cap = buf + 12 + add_len;
 
 #ifndef IPV6
   if (p->cf->advertise_ipv4)
@@ -285,18 +293,18 @@ bgp_create_open(struct bgp_conn *conn, byte *buf)
   if (p->cf->enable_extended_messages)
     cap = bgp_put_cap_ext_msg(p, cap);
 
-  cap_len = cap - buf - 12;
+  cap_len = cap - buf - 12 - add_len;
   if (cap_len > 0)
     {
-      buf[9]  = cap_len + 2;	/* Optional params len */
-      buf[10] = 2;		/* Option: Capability list */
-      buf[11] = cap_len;	/* Option length */
+      buf[9]  = cap_len + 2 + add_len;	/* Optional params len */
+      buf[10 + add_len] = 2;		/* Option: Capability list */
+      buf[11 + add_len] = cap_len;	/* Option length */
       return cap;
     }
   else
     {
-      buf[9] = 0;		/* No optional parameters */
-      return buf + 10;
+      buf[9] = add_len;		/* No optional parameters */
+      return buf + 10 + add_len;
     }
 }
 
@@ -503,9 +511,9 @@ bgp_create_update(struct bgp_conn *conn, byte *buf)
 	    ip_ll = p->local_link;
 	  else
 	    {
-	      /* If we send a route with 'third party' next hop destinated 
-	       * in the same interface, we should also send a link local 
-	       * next hop address. We use the received one (stored in the 
+	      /* If we send a route with 'third party' next hop destinated
+	       * in the same interface, we should also send a link local
+	       * next hop address. We use the received one (stored in the
 	       * other part of BA_NEXT_HOP eattr). If we didn't received
 	       * it (for example it is a static route), we can't use
 	       * 'third party' next hop and we have to use local IP address
@@ -873,7 +881,7 @@ bgp_parse_capabilities(struct bgp_conn *conn, byte *opt, int len)
 	  conn->peer_ext_messages_support = 1;
 	  break;
 
-	  /* We can safely ignore all other capabilities */
+      /* We can safely ignore all other capabilities */
 	}
       len -= 2 + cl;
       opt += 2 + cl;
@@ -914,6 +922,17 @@ bgp_parse_options(struct bgp_conn *conn, byte *opt, int len)
 	  else
 	    bgp_parse_capabilities(conn, opt + 2, ol);
 	  break;
+    case BGP_STRICT_MODE:
+      if (ol != 4) { bgp_error(conn, 2, 0, NULL, 0); return 0; }
+      int ne_role = get_u32(opt + 2);
+      int my_role = conn->bgp->cf->role;
+      if (!((my_role == ROLE_CUST && ne_role == ROLE_PROV) ||
+            (my_role == ROLE_PROV && ne_role == ROLE_CUST) ||
+            (my_role == ROLE_INTE && ne_role == ROLE_INTE) ||
+            (my_role == ROLE_PEER && ne_role == ROLE_PEER)))
+            bgp_error(conn, 2, 9, opt,ol);
+      break;
+
 
 	default:
 	  /*
@@ -1438,6 +1457,7 @@ static struct {
   { 2, 6, "Unacceptable hold time" },
   { 2, 7, "Required capability missing" }, /* [RFC5492] */
   { 2, 8, "No supported AFI/SAFI" }, /* This error msg is nonstandard */
+  { 2, 9, "Role mismatch" },
   { 3, 0, "Invalid UPDATE message" },
   { 3, 1, "Malformed attribute list" },
   { 3, 2, "Unrecognized well-known attribute" },
@@ -1565,7 +1585,7 @@ bgp_rx_notification(struct bgp_conn *conn, byte *pkt, int len)
   bgp_conn_enter_close_state(conn);
   bgp_schedule_packet(conn, PKT_SCHEDULE_CLOSE);
 
-  if (err) 
+  if (err)
     {
       bgp_update_startup_delay(p);
       bgp_stop(p, 0);
