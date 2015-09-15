@@ -69,6 +69,8 @@ struct bgp_config {
   int strict_mode;     			/* Are there conditions on role are set? */
 };
 
+#define BGP_STRICT_MODE_CAP 38
+
 #define ROLE_PEER 1
 #define ROLE_PROV 2
 #define ROLE_CUST 3
@@ -119,6 +121,7 @@ struct bgp_conn {
   u8 peer_gr_aflags;
   u8 peer_ext_messages_support;		/* Peer supports extended message length [draft] */
   unsigned hold_time, keepalive_time;	/* Times calculated from my and neighbor's requirements */
+  u32 neighbor_role;
 };
 
 struct bgp_proto {

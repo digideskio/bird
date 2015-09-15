@@ -231,6 +231,15 @@ bgp_put_cap_ext_msg(struct bgp_proto *p UNUSED, byte *buf)
   return buf;
 }
 
+static byte *
+bgp_put_cap_role(struct bgp_proto *p, byte *buf)
+{
+  *buf++ = BGP_STRICT_MODE_CAP;
+  *buf++ = 4;
+  put_u32(buf, p->cf->role);
+  return buf + 4;
+}
+
 
 static byte *
 bgp_create_open(struct bgp_conn *conn, byte *buf)
@@ -284,6 +293,9 @@ bgp_create_open(struct bgp_conn *conn, byte *buf)
 
   if (p->cf->enable_extended_messages)
     cap = bgp_put_cap_ext_msg(p, cap);
+
+  /* Capability by default */
+  cap = bgp_put_cap_role(p, cap);
 
   cap_len = cap - buf - 12;
   if (cap_len > 0)
@@ -503,9 +515,9 @@ bgp_create_update(struct bgp_conn *conn, byte *buf)
 	    ip_ll = p->local_link;
 	  else
 	    {
-	      /* If we send a route with 'third party' next hop destinated 
-	       * in the same interface, we should also send a link local 
-	       * next hop address. We use the received one (stored in the 
+	      /* If we send a route with 'third party' next hop destinated
+	       * in the same interface, we should also send a link local
+	       * next hop address. We use the received one (stored in the
 	       * other part of BA_NEXT_HOP eattr). If we didn't received
 	       * it (for example it is a static route), we can't use
 	       * 'third party' next hop and we have to use local IP address
@@ -873,6 +885,11 @@ bgp_parse_capabilities(struct bgp_conn *conn, byte *opt, int len)
 	  conn->peer_ext_messages_support = 1;
 	  break;
 
+    case BGP_STRICT_MODE_CAP:
+      if (cl != 4)
+        goto err;
+      conn->neighbor_role = get_u32(opt+2);
+      break;
 	  /* We can safely ignore all other capabilities */
 	}
       len -= 2 + cl;
@@ -956,6 +973,18 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, int len)
 
   if (bgp_parse_options(conn, pkt+29, pkt[28]))
     return;
+
+  if (p->cf->strict_mode) {
+    if (conn->neighbor_role == -1)
+      { bgp_error(conn, 2, 7, NULL, 0); return; }
+    int ne_role = conn->neighbor_role;
+    int my_role = p->cf->role;
+    if (!((my_role == ROLE_CUST && ne_role == ROLE_PROV) ||
+          (my_role == ROLE_PROV && ne_role == ROLE_CUST) ||
+          (my_role == ROLE_INTE && ne_role == ROLE_INTE) ||
+          (my_role == ROLE_PEER && ne_role == ROLE_PEER)))
+      { bgp_error(conn, 2, 9, NULL, 0); return; }
+  }
 
   if (hold > 0 && hold < 3)
     { bgp_error(conn, 2, 6, pkt+22, 2); return; }
@@ -1438,6 +1467,7 @@ static struct {
   { 2, 6, "Unacceptable hold time" },
   { 2, 7, "Required capability missing" }, /* [RFC5492] */
   { 2, 8, "No supported AFI/SAFI" }, /* This error msg is nonstandard */
+  { 2, 9, "Role mismatch" },
   { 3, 0, "Invalid UPDATE message" },
   { 3, 1, "Malformed attribute list" },
   { 3, 2, "Unrecognized well-known attribute" },
@@ -1565,7 +1595,7 @@ bgp_rx_notification(struct bgp_conn *conn, byte *pkt, int len)
   bgp_conn_enter_close_state(conn);
   bgp_schedule_packet(conn, PKT_SCHEDULE_CLOSE);
 
-  if (err) 
+  if (err)
     {
       bgp_update_startup_delay(p);
       bgp_stop(p, 0);

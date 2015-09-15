@@ -570,6 +570,7 @@ bgp_send_open(struct bgp_conn *conn)
   conn->peer_gr_flags = 0;
   conn->peer_gr_aflags = 0;
   conn->peer_ext_messages_support = 0;
+  conn->neighbor_role = -1; /* role not get */
 
   DBG("BGP: Sending open\n");
   conn->sk->rx_hook = bgp_rx;
@@ -1344,7 +1345,7 @@ bgp_check_config(struct bgp_config *c)
 
   if (!internal && (c->role==ROLE_INTE))
     cf_error("Internal role may by set only on internal connection");
- 
+
   if (c->strict_mode && (c->role==0))
     cf_error("Role must be set while using strict_mode");
 }
@@ -1535,7 +1536,17 @@ bgp_show_proto_info(struct proto *P)
   else if (P->proto_state == PS_UP)
     {
       cli_msg(-1006, "    Neighbor ID:      %R", p->remote_id);
-      cli_msg(-1006, "    Neighbor caps:   %s%s%s%s%s%s%s",
+      char *ne_role_name = NULL;
+      switch (c->neighbor_role) {
+	case ROLE_PEER: ne_role_name = "peer    "; break;
+	case ROLE_CUST: ne_role_name = "customer"; break;
+	case ROLE_PROV: ne_role_name = "provider"; break;
+	case ROLE_INTE: ne_role_name = "internal"; break;
+	case 0:         ne_role_name = "undefine"; break;
+	case -1:        ne_role_name = "unknown " ; break;
+      }
+      cli_msg(-1006, "    Neighbor caps:   %s%s%s%s%s%s%s%s%s",
+          " role=", ne_role_name,
 	      c->peer_refresh_support ? " refresh" : "",
 	      c->peer_enhanced_refresh_support ? " enhanced-refresh" : "",
 	      c->peer_gr_able ? " restart-able" : (c->peer_gr_aware ? " restart-aware" : ""),
@@ -1545,15 +1556,16 @@ bgp_show_proto_info(struct proto *P)
 	      c->peer_ext_messages_support ? " ext-messages" : "");
       char *role_name = NULL;
       switch (p->cf->role) {
-	case ROLE_PEER: role_name = "peer"; break;
-	case ROLE_CUST: role_name = "cust"; break;
-	case ROLE_PROV: role_name = "prov"; break;
-	default:       role_name = "und"; break;
+	case ROLE_PEER: role_name = "peer    "; break;
+	case ROLE_CUST: role_name = "customer"; break;
+	case ROLE_PROV: role_name = "provider"; break;
+	case ROLE_INTE: role_name = "internal"; break;
+	default:        role_name = "undefine"; break;
       }
       cli_msg(-1006, "    Session:          %s%s%s%s%s%s%s%s%s",
-	      p->is_internal ? "internal" : "external",
+	      "role=", role_name,
+	      p->is_internal ? " internal" : " external",
 	      p->cf->multihop ? " multihop" : "",
-	      " role=", role_name,
 	      p->rr_client ? " route-reflector" : "",
 	      p->rs_client ? " route-server" : "",
 	      p->as4_session ? " AS4" : "",
