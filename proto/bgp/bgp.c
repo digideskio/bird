@@ -570,7 +570,7 @@ bgp_send_open(struct bgp_conn *conn)
   conn->peer_gr_flags = 0;
   conn->peer_gr_aflags = 0;
   conn->peer_ext_messages_support = 0;
-  conn->neighbor_role = -1; /* role not get */
+  conn->neighbor_role = ROLE_UNKN; /* role not get */
 
   DBG("BGP: Sending open\n");
   conn->sk->rx_hook = bgp_rx;
@@ -1340,14 +1340,14 @@ bgp_check_config(struct bgp_config *c)
   if (c->secondary && !c->c.table->sorted)
     cf_error("BGP with secondary option requires sorted table");
 
+  if (c->role == ROLE_UNDE)
+    cf_error("Role must be set before using this bird version");
+
   if (internal && (c->role==ROLE_PEER || c->role==ROLE_CUST || c->role==ROLE_PROV))
     cf_error("Role peer, customer and provider may be set only on external connection");
 
   if (!internal && (c->role==ROLE_INTE))
     cf_error("Internal role may by set only on internal connection");
-
-  if (c->strict_mode && (c->role==0))
-    cf_error("Role must be set while using strict_mode");
 }
 
 static int
@@ -1538,12 +1538,13 @@ bgp_show_proto_info(struct proto *P)
       cli_msg(-1006, "    Neighbor ID:      %R", p->remote_id);
       char *ne_role_name = NULL;
       switch (c->neighbor_role) {
+    case ROLE_OPTI: ne_role_name = "optional"; break;
 	case ROLE_PEER: ne_role_name = "peer    "; break;
 	case ROLE_CUST: ne_role_name = "customer"; break;
 	case ROLE_PROV: ne_role_name = "provider"; break;
 	case ROLE_INTE: ne_role_name = "internal"; break;
-	case 0:         ne_role_name = "undefine"; break;
-	case -1:        ne_role_name = "unknown " ; break;
+	case ROLE_UNDE: ne_role_name = "undefine"; break;
+	case ROLE_UNKN: ne_role_name = "unknown "; break;
       }
       cli_msg(-1006, "    Neighbor caps:   %s%s%s%s%s%s%s%s%s",
           " role=", ne_role_name,

@@ -974,17 +974,19 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, int len)
   if (bgp_parse_options(conn, pkt+29, pkt[28]))
     return;
 
-  if (p->cf->strict_mode) {
-    if (conn->neighbor_role == -1)
-      { bgp_error(conn, 2, 7, NULL, 0); return; }
-    int ne_role = conn->neighbor_role;
-    int my_role = p->cf->role;
-    if (!((my_role == ROLE_CUST && ne_role == ROLE_PROV) ||
-          (my_role == ROLE_PROV && ne_role == ROLE_CUST) ||
-          (my_role == ROLE_INTE && ne_role == ROLE_INTE) ||
-          (my_role == ROLE_PEER && ne_role == ROLE_PEER)))
+  int ne_role = conn->neighbor_role;
+  int my_role = p->cf->role;
+
+  if ((ne_role != ROLE_UNKN) && !(
+                                (my_role == ROLE_CUST && ne_role == ROLE_PROV) ||
+                                (my_role == ROLE_PROV && ne_role == ROLE_CUST) ||
+                                (my_role == ROLE_INTE && ne_role == ROLE_INTE) ||
+                                (my_role == ROLE_PEER && ne_role == ROLE_PEER) ||
+                                (my_role == ROLE_OPTI && ne_role == ROLE_OPTI)))
       { bgp_error(conn, 2, 9, NULL, 0); return; }
-  }
+
+  if ((p->cf->strict_mode) && (ne_role == ROLE_UNKN))
+      { bgp_error(conn, 2, 7, NULL, 0); return; }
 
   if (hold > 0 && hold < 3)
     { bgp_error(conn, 2, 6, pkt+22, 2); return; }
