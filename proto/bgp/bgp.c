@@ -1345,9 +1345,6 @@ bgp_check_config(struct bgp_config *c)
 
   if (internal && (c->role==ROLE_PEER || c->role==ROLE_CUST || c->role==ROLE_PROV))
     cf_error("Role peer, customer and provider may be set only on external connection");
-
-  if (!internal && (c->role==ROLE_INTE))
-    cf_error("Internal role may by set only on internal connection");
 }
 
 static int
@@ -1538,8 +1535,7 @@ bgp_show_proto_info(struct proto *P)
       cli_msg(-1006, "    Neighbor ID:      %R", p->remote_id);
       char *ne_role_name = NULL;
       switch (c->neighbor_role) {
-    case ROLE_OPTI: ne_role_name = "optional"; break;
-	case ROLE_PEER: ne_role_name = "peer    "; break;
+    case ROLE_PEER: ne_role_name = "peer    "; break;
 	case ROLE_CUST: ne_role_name = "customer"; break;
 	case ROLE_PROV: ne_role_name = "provider"; break;
 	case ROLE_INTE: ne_role_name = "internal"; break;

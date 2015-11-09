@@ -495,7 +495,8 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
 	continue;
 #endif
 
-      if ((code == BA_LOCAL_ANNOUNCE) && (!p->is_internal))
+      /* Delete attribute while exiting Internal set of AS */
+      if ((code == BA_LOCAL_ANNOUNCE) && (!(p->cf->role == ROLE_INTE)))
 	continue;
 
       /* When AS4-aware BGP speaker is talking to non-AS4-aware BGP speaker,
@@ -1051,7 +1052,7 @@ static int
 bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *pool, int rr)
 {
   eattr *a;
- 	
+
   if (!p->is_internal && !p->rs_client)
     {
       bgp_path_prepend(e, attrs, pool, p->local_as);
@@ -1158,7 +1159,7 @@ bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *
       if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) &&
            ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE)))
 	return -1;
-	
+
       if (p->local_as == new_bgp->local_as && p->is_internal && new_bgp->is_internal)
 	{
 	  /* Redistribution of internal routes with IBGP */
@@ -1862,10 +1863,10 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
 
   /* Add local announce */
-  if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV) 
+  if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV)
     if (!(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE))))
 	   bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_ANNOUNCE, 0);
-    	
+
 
   return a;
 

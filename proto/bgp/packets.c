@@ -981,8 +981,7 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, int len)
                                 (my_role == ROLE_CUST && ne_role == ROLE_PROV) ||
                                 (my_role == ROLE_PROV && ne_role == ROLE_CUST) ||
                                 (my_role == ROLE_INTE && ne_role == ROLE_INTE) ||
-                                (my_role == ROLE_PEER && ne_role == ROLE_PEER) ||
-                                (my_role == ROLE_OPTI && ne_role == ROLE_OPTI)))
+                                (my_role == ROLE_PEER && ne_role == ROLE_PEER)))
       { bgp_error(conn, 2, 9, NULL, 0); return; }
 
   if ((p->cf->strict_mode) && (ne_role == ROLE_UNKN))

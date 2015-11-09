@@ -71,13 +71,12 @@ struct bgp_config {
 
 #define BGP_STRICT_MODE_CAP 38
 
-#define ROLE_UNKN 0
-#define ROLE_UNDE 1
-#define ROLE_PEER 10
-#define ROLE_PROV 11
-#define ROLE_CUST 12
-#define ROLE_INTE 13
-#define ROLE_OPTI 14
+#define ROLE_UNKN 255
+#define ROLE_UNDE 0
+#define ROLE_PEER 1
+#define ROLE_PROV 2
+#define ROLE_CUST 3
+#define ROLE_INTE 4
 
 #define MLL_SELF 1
 #define MLL_DROP 2
