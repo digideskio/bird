@@ -1341,7 +1341,7 @@ bgp_check_config(struct bgp_config *c)
     cf_error("BGP with secondary option requires sorted table");
 
   if (c->role == ROLE_UNDE)
-    cf_error("Role must be set before using this bird version");
+    cf_error("Role must be set for each BGP protocol");
 
   if (internal && (c->role==ROLE_PEER || c->role==ROLE_CUST || c->role==ROLE_PROV))
     cf_error("Role peer, customer and provider may be set only on external connection");
