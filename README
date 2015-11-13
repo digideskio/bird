@@ -26,10 +26,10 @@ Roles: (Provider, Customer), (Customer, Provider), (Peer, Peer), (Internal, Inte
 Change in BGP Configuration:
 In each BGP protocol section you must set a role option.  Currently, there 
 are 4 possible values for this option:
-1) "Provider" - neighbor is your upstream provider;
-2) "Customer" - neighbor is your customer;
-3) "Peer" - neighbor is your peer;
-4) "Internal" - neighbor is part of your AS or company (in case of multiple AS).
+1) "provider" - neighbor is your upstream provider;
+2) "customer" - neighbor is your customer;
+3) "peer" - neighbor is your peer;
+4) "internal" - neighbor is part of your AS or company (in case of multiple AS).
 Without setting a role in BGP protocol section you will receive error message 
 from config parser.
 Also you could set strict_mode option in BGP protocol section.  In this scenario 
