@@ -12,17 +12,6 @@ This BGP implementation supports full compatibility with other BGP implementatio
 except the case where strict_mode is set by user.
 
 
-BGP Protocol modification:
-There are two main changes in BGP protocol behaviour:
-1. BGP Update modification: to routes that were learned from upstreams or peers 
-add special non-transitive attribute “Local Announce” (BGP Path attribute code 19).  
-On links with upstreams and peers filter out routes with determined attribute; 
-2. BGP Open modification: to OPEN messages add new capability option "Role" 
-(Capability code 38), in which broadcast value of Role configuration option.  
-Establish connection only if speaker and its neighbor have appropriate pair of 
-Roles: (Provider, Customer), (Customer, Provider), (Peer, Peer), (Internal, Internal).
-
-
 Change in BGP Configuration:
 In each BGP protocol section you must set a role option.  Currently, there 
 are 4 possible values for this option:
@@ -37,6 +26,17 @@ BGP session with your neighbor will be established only if your neighbor also
 support Roles and corresponding Role is correct.
 
 
+BGP Protocol modification:
+There are two main changes in BGP protocol behaviour:
+1. BGP Update modification: to routes that were learned from upstreams or peers 
+add special non-transitive attribute “Local Announce” (BGP Path attribute code 19).  
+On links with upstreams and peers filter out routes with determined attribute; 
+2. BGP Open modification: to OPEN messages add new capability option "Role" 
+(Capability code 38), in which broadcast value of Role configuration option.  
+Establish connection only if speaker and its neighbor have appropriate pair of 
+Roles: (provider, customer), (customer, provider), (peer, peer), (internal, internal).
+
+
 How to install BIRD:
 
 
@@ -45,7 +45,7 @@ How to install BIRD:
         make install
 
 
-Example of configuration with new options can be seen in /usr/local/etc/bird.conf.
+Example of configuration with new options can be seen in doc/bird.conf.example
 
 
 
