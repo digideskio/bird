@@ -60,13 +60,15 @@ struct bgp_config {
   unsigned error_delay_time_min;	/* Time to wait after an error is detected */
   unsigned error_delay_time_max;
   unsigned disable_after_error;		/* Disable the protocol when error is detected */
+  int role;            			/* Neighboor role of (i|e)bgp connection */
+  int strict_mode;     			/* Are there conditions on role are set? */
+  /* Don't move any of above items below "password", because it will change
+  reconfiguration logic due bgp_reconfigure() */
 
   char *password;			/* Password used for MD5 authentication */
   struct rtable_config *igp_table;	/* Table used for recursive next hop lookups */
   int check_link;			/* Use iface link state for liveness detection */
   int bfd;				/* Use BFD for liveness detection */
-  int role;            			/* Neighboor role of (i|e)bgp connection */
-  int strict_mode;     			/* Are there conditions on role are set? */
 };
 
 #define BGP_STRICT_MODE_CAP 38
