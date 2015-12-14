@@ -28,7 +28,7 @@ CF_KEYWORDS(BGP, LOCAL, NEIGHBOR, AS, HOLD, TIME, CONNECT, RETRY,
 	TABLE, GATEWAY, DIRECT, RECURSIVE, MED, TTL, SECURITY, DETERMINISTIC,
 	SECONDARY, ALLOW, BFD, ADD, PATHS, RX, TX, GRACEFUL, RESTART, AWARE,
 	CHECK, LINK, PORT, EXTENDED, MESSAGES, ROLE, PEER, PROVIDER, CUSTOMER,
-	INTERNAL, STRICT_MODE)
+	INTERNAL, STRICT_MODE, ROLE_LOCAL_PREF)
 
 
 CF_GRAMMAR
@@ -58,6 +58,9 @@ bgp_proto_start: proto_start BGP {
      BGP_CFG->gr_time = 120;
      BGP_CFG->role = ROLE_UNDE;
      BGP_CFG->strict_mode = 0;
+     BGP_CFG->customer_local_pref = 90;
+     BGP_CFG->peer_local_pref = 60;
+     BGP_CFG->provider_local_pref = 30;
  }
  ;
 
@@ -142,6 +145,7 @@ bgp_proto:
  | bgp_proto ROLE CUSTOMER ';' { BGP_CFG->role = ROLE_CUST; }
  | bgp_proto ROLE INTERNAL ';' { BGP_CFG->role = ROLE_INTE; }
  | bgp_proto STRICT_MODE ';' { BGP_CFG->strict_mode = 1; }
+ | bgp_proto ROLE_LOCAL_PREF expr expr expr ';' { BGP_CFG->customer_local_pref = $3; BGP_CFG->peer_local_pref = $4; BGP_CFG->provider_local_pref = $5; }
  ;
 
 CF_ADDTO(dynamic_attr, BGP_ORIGIN

@@ -794,7 +794,10 @@ bgp_get_bucket(struct bgp_proto *p, net *n, ea_list *attrs, int originate)
       code = EA_ID(a->id);
       if (ATTR_KNOWN(code))
 	{
-	  if (!bgp_attr_table[code].allow_in_ebgp && !p->is_internal)
+	  if (!bgp_attr_table[code].allow_in_ebgp && !p->is_internal &&
+	      !(code == BA_LOCAL_PREF &&
+	        p->cf->role == ROLE_INTE &&
+	        p->conn->neighbor_role == ROLE_INTE))
 	    continue;
 	  /* The flags might have been zero if the attr was added by filters */
 	  a->flags = (a->flags & BAF_PARTIAL) | bgp_attr_table[code].expected_flags;
@@ -1069,8 +1072,11 @@ bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
        * propagated to other neighboring ASes.
        * Perhaps it would be better to undefine it.
        */
+
+       /* UPDATE: propagate MULTI_EXIT_DISC attribute between neighbors with ROLE_INTE
+        */
       a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_MULTI_EXIT_DISC));
-      if (a)
+      if (a && !(p->cf->role == ROLE_INTE && p->conn->neighbor_role == ROLE_INTE))
 	bgp_attach_attr(attrs, pool, BA_MULTI_EXIT_DISC, 0);
     }
 
@@ -1284,11 +1290,13 @@ bgp_rte_better(rte *new, rte *old)
 	return 0;
     }
 
-  /* RFC 4271 9.1.2.2. d) Prefer external peers */
-  if (new_bgp->is_internal > old_bgp->is_internal)
-    return 0;
-  if (new_bgp->is_internal < old_bgp->is_internal)
+  /* New characteristic to measure routes. Routes from external
+  roles (peer, customer, provider) are more preferable than from
+  internal role. Replace ebgp > ibgp. */
+  if (new_bgp->cf->role != ROLE_INTE && old_bgp->cf->role == ROLE_INTE)
     return 1;
+  if (new_bgp->cf->role == ROLE_INTE && old_bgp->cf->role != ROLE_INTE)
+    return 0;
 
   /* RFC 4271 9.1.2.2. e) Compare IGP metrics */
   n = new_bgp->cf->igp_metric ? new->attrs->igp_metric : 0;
@@ -1391,8 +1399,11 @@ bgp_rte_mergable(rte *pri, rte *sec)
 	return 0;
     }
 
-  /* RFC 4271 9.1.2.2. d) Prefer external peers */
-  if (pri_bgp->is_internal != sec_bgp->is_internal)
+  /* New characteristic to measure routes. Routes from external
+  roles (peer, customer, provider) are more preferable than from
+  internal role. Replace ebgp > ibgp. */
+  if (pri_bgp->cf->role == ROLE_INTE && sec_bgp->cf->role != ROLE_INTE ||
+      sec_bgp->cf->role == ROLE_INTE && pri_bgp->cf->role != ROLE_INTE)
     return 0;
 
   /* RFC 4271 9.1.2.2. e) Compare IGP metrics */
@@ -1749,7 +1760,8 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
 	    { errcode = 5; goto err; }
 	  if ((desc->expected_flags ^ flags) & (BAF_OPTIONAL | BAF_TRANSITIVE))
 	    { errcode = 4; goto err; }
-	  if (!desc->allow_in_ebgp && !bgp->is_internal)
+	  if (!desc->allow_in_ebgp && !bgp->is_internal &&
+	      !(code == BA_LOCAL_PREF && bgp->cf->role == ROLE_INTE && bgp->conn->neighbor_role == ROLE_INTE))
 	    continue;
 	  if (desc->validate)
 	    {
@@ -1869,6 +1881,15 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
   /* If there's no local preference, define one */
   if (!(seen[0] & (1 << BA_LOCAL_PREF)))
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
+
+  if (conn->bgp->cf->role == ROLE_PEER)
+    bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, conn->bgp->cf->peer_local_pref);
+
+  if (conn->bgp->cf->role == ROLE_CUST)
+    bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, conn->bgp->cf->customer_local_pref);
+
+  if (conn->bgp->cf->role == ROLE_PROV)
+    bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, conn->bgp->cf->provider_local_pref);
 
    /* Lower in priority routes, that have already comen with BA_LOCAL_ANNOUNCE */
    if ((conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_CUST) &&

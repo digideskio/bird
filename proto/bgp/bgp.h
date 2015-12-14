@@ -62,6 +62,10 @@ struct bgp_config {
   unsigned disable_after_error;		/* Disable the protocol when error is detected */
   int role;            			/* Neighboor role of (i|e)bgp connection */
   int strict_mode;     			/* Are there conditions on role are set? */
+  int customer_local_pref;
+  int provider_local_pref;
+  int peer_local_pref;
+
   /* Don't move any of above items below "password", because it will change
   reconfiguration logic due bgp_reconfigure() */
 
