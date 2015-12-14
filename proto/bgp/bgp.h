@@ -424,4 +424,6 @@ void bgp_log_error(struct bgp_proto *p, u8 class, char *msg, unsigned code, unsi
 #define BGP_AF BGP_AF_IPV4
 #endif
 
+#define DEF_LOCAL_PREF_LEAK 0
+
 #endif

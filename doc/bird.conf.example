@@ -168,13 +168,13 @@ protocol static {
 #}
 
 
-#protocol bgp {
+protocol bgp {
 #	disabled;
-#	description "My BGP uplink";
-#	local as 65000;
-#	neighbor 198.51.100.130 as 64496;
-#	multihop;
-#       role peer;              # Set your neighbor role in bgp connection, other possible values are "provider",
+	description "My BGP uplink";
+	local as 65000;
+	neighbor 198.51.100.130 as 64496;
+	multihop;
+        role peer;              # Set your neighbor role in bgp connection, other possible values are "provider",
 #                               # "customer", "internal"; without this option protocol doesn't allow daemon to start
 #       strict_mode;            # Turn on strict mode for role checking while establishing bgp connection; 
 #                               # default state off
@@ -209,7 +209,7 @@ protocol static {
 #		}
 #		reject;
 #	};
-#}
+}
 #
 # Template usage example
 #template bgp rr_client {

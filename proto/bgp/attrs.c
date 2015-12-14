@@ -325,7 +325,7 @@ static struct attr_desc bgp_attr_table[] = {
     NULL, NULL },
   { "as4_aggregator", -1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_OPAQUE, 1,	/* BA_AS4_PATH */
     NULL, NULL },
-  { "local_announce", 1, BAF_OPTIONAL, EAF_TYPE_INT, 1,                          /* BA_LOCAL_ANNOUNCE */
+  { "local_announce", 1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_INT, 1,        /* BA_LOCAL_ANNOUNCE */
     NULL, NULL }
 };
 
@@ -494,10 +494,6 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
       if (code == BA_NEXT_HOP)
 	continue;
 #endif
-
-      /* Delete attribute while exiting Internal set of AS */
-      if ((code == BA_LOCAL_ANNOUNCE) && (!(p->cf->role == ROLE_INTE)))
-	continue;
 
       /* When AS4-aware BGP speaker is talking to non-AS4-aware BGP speaker,
        * we have to convert our 4B AS_PATH to 2B AS_PATH and send our AS_PATH
@@ -1007,6 +1003,11 @@ bgp_create_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
 
   bgp_set_attr(ea->attrs+3, BA_LOCAL_PREF, p->cf->default_local_pref);
 
+  //The simplest way to add attribute during creation
+  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_CUST) && p->conn->neighbor_role == ROLE_UNKN)
+    bgp_attach_attr(attrs, pool, BA_LOCAL_ANNOUNCE, 0);
+
+
   return 0;				/* Leave decision to the filters */
 }
 
@@ -1052,6 +1053,13 @@ static int
 bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *pool, int rr)
 {
   eattr *a;
+
+  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_CUST) && p->conn->neighbor_role == ROLE_UNKN)
+    {
+      a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE));
+      if (!a) bgp_attach_attr(attrs, pool, BA_LOCAL_ANNOUNCE, 0);
+    }
+
 
   if (!p->is_internal && !p->rs_client)
     {
@@ -1862,10 +1870,15 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
   if (!(seen[0] & (1 << BA_LOCAL_PREF)))
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
 
-  /* Add local announce */
-  if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV)
-    if (!(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE))))
-	   bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_ANNOUNCE, 0);
+   /* Lower in priority routes, that have already comen with BA_LOCAL_ANNOUNCE */
+   if ((conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_CUST) &&
+     (seen[BA_LOCAL_ANNOUNCE / 8] & (1 << (BA_LOCAL_ANNOUNCE % 8))))
+         bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, DEF_LOCAL_PREF_LEAK);
+
+   /* Add local announce to routes, that haven't this attribute yet */
+   if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV)
+     if (!(seen[BA_LOCAL_ANNOUNCE / 8] & (1 << (BA_LOCAL_ANNOUNCE % 8))))
+ 	   bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_ANNOUNCE, 0);
 
 
   return a;
