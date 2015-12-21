@@ -3,37 +3,40 @@
 
 
 
-This is a fork of BIRD Routing daemon (v1.5.0) with built in protection against 
-BGP route leaks.  Route leak is a network anomaly, when route learned from 
-provider or peer is announced to another provider or peer.  The effect of such 
-issues could vary from increased network delays for victim (originator of prefix) 
+This is a fork of BIRD Routing daemon (v1.5.0) with built in protection against
+BGP route leaks.  Route leak is a network anomaly, when route learned from
+provider or peer is announced to another provider or peer.  The effect of such
+issues could vary from increased network delays for victim (originator of prefix)
 to DoS for both victim and leaker.
-This BGP implementation supports full compatibility with other BGP implementations 
+This BGP implementation supports full compatibility with other BGP implementations
 except the case where strict_mode is set by user.
 
 
 Change in BGP Configuration:
-In each BGP protocol section you must set a role option.  Currently, there 
+In each BGP protocol section you must set a role option.  Currently, there
 are 4 possible values for this option:
 1) "provider" - neighbor is your upstream provider;
 2) "customer" - neighbor is your customer;
 3) "peer" - neighbor is your peer;
 4) "internal" - neighbor is part of your AS or company (in case of multiple AS).
-Without setting a role in BGP protocol section you will receive error message 
+Without setting a role in BGP protocol section you will receive error message
 from config parser.
-Also you could set strict_mode option in BGP protocol section.  In this scenario 
-BGP session with your neighbor will be established only if your neighbor also 
+Also you could set strict_mode option in BGP protocol section.  In this scenario
+BGP session with your neighbor will be established only if your neighbor also
 support Roles and corresponding Role is correct.
 
 
 BGP Protocol modification:
 There are two main changes in BGP protocol behaviour:
-1. BGP Update modification: to routes that were learned from upstreams or peers 
-add special non-transitive attribute “Local Announce” (BGP Path attribute code 19).  
-On links with upstreams and peers filter out routes with determined attribute; 
-2. BGP Open modification: to OPEN messages add new capability option "Role" 
-(Capability code 38), in which broadcast value of Role configuration option.  
-Establish connection only if speaker and its neighbor have appropriate pair of 
+1. BGP Update modification: to routes that were learned from upstreams or peers
+add special transitive attribute “Local Announce” (BGP Path attribute code 19).
+On links with upstreams and peers filter out routes with determined attribute.
+Also add this attribute to routes in customers and peers direction if neighbors
+don't set their role and lower in priority routes, that already came with such an
+attribute from peers or customers;
+2. BGP Open modification: to OPEN messages add new capability option "Role"
+(Capability code 38), in which broadcast value of Role configuration option.
+Establish connection only if speaker and its neighbor have appropriate pair of
 Roles: (provider, customer), (customer, provider), (peer, peer), (internal, internal).
 
 
