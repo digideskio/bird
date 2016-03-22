@@ -234,7 +234,7 @@ bgp_put_cap_ext_msg(struct bgp_proto *p UNUSED, byte *buf)
 static byte *
 bgp_put_cap_role(struct bgp_proto *p, byte *buf)
 {
-  *buf++ = BGP_STRICT_MODE_CAP;
+  *buf++ = BGP_ROLE_CAP;
   *buf++ = 4;
   put_u32(buf, p->cf->role);
   return buf + 4;
@@ -885,7 +885,7 @@ bgp_parse_capabilities(struct bgp_conn *conn, byte *opt, int len)
 	  conn->peer_ext_messages_support = 1;
 	  break;
 
-    case BGP_STRICT_MODE_CAP:
+    case BGP_ROLE_CAP:
       if (cl != 4)
         goto err;
       conn->neighbor_role = get_u32(opt+2);
@@ -985,7 +985,7 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, int len)
       { bgp_error(conn, 2, 9, NULL, 0); return; }
 
   if ((p->cf->strict_mode) && (ne_role == ROLE_UNKN))
-      { bgp_error(conn, 2, 7, NULL, 0); return; }
+      { bgp_error(conn, 6, 5, NULL, 0); return; }
 
   if (hold > 0 && hold < 3)
     { bgp_error(conn, 2, 6, pkt+22, 2); return; }

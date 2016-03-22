@@ -60,7 +60,7 @@ struct bgp_config {
   unsigned error_delay_time_min;	/* Time to wait after an error is detected */
   unsigned error_delay_time_max;
   unsigned disable_after_error;		/* Disable the protocol when error is detected */
-  int role;            			/* Neighboor role of (i|e)bgp connection */
+  int role;            			/* Your role in (i|e)BGP connection */
   int strict_mode;     			/* Are there conditions on role are set? */
   /* Don't move any of above items below "password", because it will change
   reconfiguration logic due bgp_reconfigure() */
@@ -71,7 +71,7 @@ struct bgp_config {
   int bfd;				/* Use BFD for liveness detection */
 };
 
-#define BGP_STRICT_MODE_CAP 38
+#define BGP_ROLE_CAP 38
 
 #define ROLE_UNKN 255
 #define ROLE_UNDE 0
@@ -321,7 +321,7 @@ void bgp_log_error(struct bgp_proto *p, u8 class, char *msg, unsigned code, unsi
 #define BA_EXT_COMMUNITY	0x10	/* [RFC4360] */
 #define BA_AS4_PATH             0x11    /* [RFC4893] */
 #define BA_AS4_AGGREGATOR       0x12
-#define BA_LOCAL_ANNOUNCE        0x13    /* Ability to announce path to IX and ISP */
+#define BA_OTC        0x13
 
 /* BGP connection states */
 

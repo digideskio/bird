@@ -9,7 +9,6 @@
 #undef LOCAL_DEBUG
 
 #include <stdlib.h>
-#include <stdio.h>
 
 #include "nest/bird.h"
 #include "nest/iface.h"
@@ -325,7 +324,7 @@ static struct attr_desc bgp_attr_table[] = {
     NULL, NULL },
   { "as4_aggregator", -1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_OPAQUE, 1,	/* BA_AS4_PATH */
     NULL, NULL },
-  { "local_announce", 1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_INT, 1,        /* BA_LOCAL_ANNOUNCE */
+  { "otc", 0, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_INT, 1,        /* BA_OTC */
     NULL, NULL }
 };
 
@@ -1004,8 +1003,8 @@ bgp_create_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
   bgp_set_attr(ea->attrs+3, BA_LOCAL_PREF, p->cf->default_local_pref);
 
   //The simplest way to add attribute during creation
-  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_CUST) && p->conn->neighbor_role == ROLE_UNKN)
-    bgp_attach_attr(attrs, pool, BA_LOCAL_ANNOUNCE, 0);
+  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) && p->conn->neighbor_role == ROLE_UNKN)
+    bgp_attach_attr(attrs, pool, BA_OTC, 0);
 
 
   return 0;				/* Leave decision to the filters */
@@ -1054,10 +1053,10 @@ bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
 {
   eattr *a;
 
-  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_CUST) && p->conn->neighbor_role == ROLE_UNKN)
+  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) && p->conn->neighbor_role == ROLE_UNKN)
     {
-      a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE));
-      if (!a) bgp_attach_attr(attrs, pool, BA_LOCAL_ANNOUNCE, 0);
+      a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_OTC));
+      if (!a) bgp_attach_attr(attrs, pool, BA_OTC, 0);
     }
 
 
@@ -1164,8 +1163,8 @@ bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *
 	return -1;
 
       /* Add default filter by role and attribute */
-      if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) &&
-           ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_ANNOUNCE)))
+      if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_CUST) &&
+           ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_OTC)))
 	return -1;
 
       if (p->local_as == new_bgp->local_as && p->is_internal && new_bgp->is_internal)
@@ -1871,14 +1870,14 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
 
    /* Lower in priority routes, that have already comen with BA_LOCAL_ANNOUNCE */
-   if ((conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_CUST) &&
-     (seen[BA_LOCAL_ANNOUNCE / 8] & (1 << (BA_LOCAL_ANNOUNCE % 8))))
+   if ((conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV) &&
+     (seen[BA_OTC / 8] & (1 << (BA_OTC % 8))))
          bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, DEF_LOCAL_PREF_LEAK);
 
    /* Add local announce to routes, that haven't this attribute yet */
-   if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV)
-     if (!(seen[BA_LOCAL_ANNOUNCE / 8] & (1 << (BA_LOCAL_ANNOUNCE % 8))))
- 	   bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_ANNOUNCE, 0);
+   if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_CUST)
+     if (!(seen[BA_OTC / 8] & (1 << (BA_OTC % 8))))
+ 	   bgp_attach_attr(&a->eattrs, pool, BA_OTC, 0);
 
 
   return a;
