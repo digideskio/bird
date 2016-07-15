@@ -45,6 +45,7 @@
 #include "nest/attrs.h"
 #include "conf/conf.h"
 #include "filter/filter.h"
+#include "proto/bgp/bgp.h"
 
 #define P(a,b) ((a<<8) | b)
 
@@ -142,6 +143,7 @@ val_compare(struct f_val v1, struct f_val v2)
   case T_BOOL:
   case T_PAIR:
   case T_QUAD:
+  case T_ROLE:
     return uint_cmp(v1.val.i, v2.val.i);
   case T_EC:
     return u64_cmp(v1.val.ec, v2.val.ec);
@@ -436,6 +438,7 @@ val_format(struct f_val v, buffer *buf)
   case T_VOID:	buffer_puts(buf, "(void)"); return;
   case T_BOOL:	buffer_puts(buf, v.val.i ? "TRUE" : "FALSE"); return;
   case T_INT:	buffer_print(buf, "%u", v.val.i); return;
+  case T_ROLE: /* TODO: uint or string formal name? */ return;
   case T_STRING: buffer_print(buf, "%s", v.val.s); return;
   case T_IP:	buffer_print(buf, "%I", v.val.px.ip); return;
   case T_PREFIX: buffer_print(buf, "%I/%d", v.val.px.ip, v.val.px.len); return;
@@ -454,6 +457,7 @@ val_format(struct f_val v, buffer *buf)
 }
 
 static struct rte **f_rte;
+static net *f_net = NULL;
 static struct rta *f_old_rta;
 static struct ea_list **f_tmp_attrs;
 static struct linpool *f_pool;
@@ -805,6 +809,14 @@ interpret(struct f_inst *what)
       default:
 	bug("Invalid static attribute access (%x)", res.type);
       }
+    }
+    break;
+  case P('n','p'):
+    {
+      if (!f_net) runtime("No net to access, use net command instead");
+      res.type = T_PREFIX;
+      res.val.px.ip = f_net->n.prefix;
+      res.val.px.len = f_net->n.pxlen;
     }
     break;
   case P('a','S'):
@@ -1526,6 +1538,31 @@ f_run(struct filter *filter, struct rte **rte, struct ea_list **tmp_attrs, struc
   DBG( "done (%u)\n", res.val.i );
   return res.val.i;
 }
+
+int
+rm_run(struct role_map *role_map, net *net_entry)
+{
+  DBG( "Running role_map `%s'...", role_map->name );
+
+  f_rte = NULL;
+  f_tmp_attrs = NULL;
+  f_pool = NULL;
+  f_net = net_entry;
+  f_flags = 0;
+
+  LOG_BUFFER_INIT(f_buf);
+
+  struct f_val res = interpret(role_map->root);
+  f_net = NULL;
+
+  if (res.type != T_ROLE) {
+    log_rl(&rl_runtime_err, L_ERR "Role_map %s did not return role. Make up your mind", role_map->name);
+    return ROLE_UNKN;
+  }
+  DBG( "done (%u)\n", res.val.i );
+  return res.val.i;
+}
+
 
 /* TODO: perhaps we could integrate f_eval(), f_eval_rte() and f_run() */
 

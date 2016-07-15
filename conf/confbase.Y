@@ -43,6 +43,7 @@ CF_DECLS
   char *t;
   struct rtable_config *r;
   struct f_inst *x;
+  struct role_map *rm;
   struct filter *f;
   struct f_tree *e;
   struct f_trie *trie;

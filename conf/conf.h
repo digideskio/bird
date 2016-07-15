@@ -122,6 +122,7 @@ struct symbol {
 #define SYM_FILTER 4
 #define SYM_TABLE 5
 #define SYM_ROA 6
+#define SYM_ROLE_MAP 7
 
 #define SYM_VARIABLE 0x100	/* 0x100-0x1ff are variable types */
 #define SYM_CONSTANT 0x200	/* 0x200-0x2ff are variable types */

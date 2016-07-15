@@ -286,14 +286,16 @@ CF_KEYWORDS(FUNCTION, PRINT, PRINTN, UNSET, RETURN,
 	PREPEND, FIRST, LAST, MATCH,
 	ROA_CHECK,
 	EMPTY,
-	FILTER, WHERE, EVAL)
+	FILTER, WHERE, EVAL,
+	ROLE_MAP, NET_PREFIX, PREFIX_ROLE)
 
 %nonassoc THEN
 %nonassoc ELSE
 
 %type <x> term block cmds cmds_int cmd function_body constant constructor print_one print_list var_list var_listn dynamic_attr static_attr function_call symbol bgp_path_expr
+%type <rm> role_map role_map_body
 %type <f> filter filter_body where_filter
-%type <i> type break_command pair_expr ec_kind
+%type <i> type break_command pair_expr ec_kind role_name
 %type <i32> pair_atom ec_expr
 %type <e> pair_item ec_item set_item switch_item set_items switch_items switch_body
 %type <trie> fprefix_set
@@ -310,6 +312,17 @@ filter_def:
      $2->def = $4;
      $4->name = $2->name;
      DBG( "We have new filter defined (%s)\n", $2->name );
+     cf_pop_scope();
+   }
+ ;
+
+CF_ADDTO(conf, role_map_def)
+role_map_def:
+   ROLE_MAP SYM { $2 = cf_define_symbol($2, SYM_ROLE_MAP, NULL); cf_push_scope( $2 ); }
+     role_map_body {
+     $2->def = $4;
+     $4->name = $2->name;
+     DBG( "We have new role_map defined (%s)\n", $2->name );
      cf_pop_scope();
    }
  ;
@@ -388,12 +401,47 @@ filter_body:
    }
  ;
 
+role_name:
+   PEER     { $$ = ROLE_PEER; }
+ | PROVIDER { $$ = ROLE_PROV; }
+ | CUSTOMER { $$ = ROLE_CUST; }
+ | INTERNAL { $$ = ROLE_INTE; }
+
+
+role_map_body:
+   function_body {
+     struct role_map *rm = cfg_alloc(sizeof(struct role_map));
+     rm->name = NULL;
+     struct f_inst *default_role = f_new_inst();
+     default_role->code = 'c';
+     default_role->aux = T_ROLE;
+     default_role->a2.i = ROLE_UNKN;
+     struct f_inst *tmp = $1;
+     while (tmp->next) tmp = tmp->next;
+     tmp->next = default_role;
+     struct f_inst *strip_result = f_new_inst();
+     strip_result->code = P('c','a');
+     strip_result->a1.p = NULL;
+     strip_result->a2.p = $1;
+     rm->root = strip_result;
+     $$ = rm;
+   }
+ ;
+
 filter:
    SYM {
      if ($1->class != SYM_FILTER) cf_error("No such filter.");
      $$ = $1->def;
    }
  | filter_body
+ ;
+
+role_map:
+   SYM {
+     if ($1->class != SYM_ROLE_MAP) cf_error("No such role_map.");
+     $$ = $1->def;
+   }
+ | role_map_body
  ;
 
 where_filter:
@@ -744,6 +792,7 @@ term:
  | PREFERENCE { $$ = f_new_inst(); $$->code = 'P'; }
 
  | rtadot static_attr { $$ = $2; $$->code = 'a'; }
+ | NET_PREFIX {$$ = f_new_inst(); $$->code = P('n','p'); }
 
  | rtadot dynamic_attr { $$ = $2; $$->code = P('e','a'); }
 
@@ -866,6 +915,16 @@ cmd:
      $$->a1.p = $1;
      $$->a2.p = $3;
    }
+ | PREFIX_ROLE role_name ';' {
+     struct f_inst *tmp = f_new_inst();
+     tmp->code = 'c';
+     tmp->aux = T_ROLE;
+     tmp->a2.i = $2;
+     $$ = f_new_inst();
+     $$->code = 'r';
+     $$->a1.p = tmp;
+   }
+
  | RETURN term ';' {
      $$ = f_new_inst();
      DBG( "Ook, we'll return the value\n" );

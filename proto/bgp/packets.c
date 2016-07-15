@@ -21,6 +21,7 @@
 #include "nest/cli.h"
 
 #include "bgp.h"
+#include "../../filter/filter.h"
 
 
 #define BGP_RR_REQUEST		0
@@ -981,7 +982,8 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, int len)
                                 (my_role == ROLE_CUST && ne_role == ROLE_PROV) ||
                                 (my_role == ROLE_PROV && ne_role == ROLE_CUST) ||
                                 (my_role == ROLE_INTE && ne_role == ROLE_INTE) ||
-                                (my_role == ROLE_PEER && ne_role == ROLE_PEER)))
+                                (my_role == ROLE_PEER && ne_role == ROLE_PEER) ||
+                                (my_role == ROLE_COMP && ne_role == ROLE_COMP)))
       { bgp_error(conn, 2, 9, NULL, 0); return; }
 
   if ((p->cf->strict_mode) && (ne_role == ROLE_UNKN))
@@ -1135,6 +1137,30 @@ bgp_rte_update(struct bgp_proto *p, ip_addr prefix, int pxlen,
 	}
     }
 
+  net *n = net_get(p->p.table, prefix, pxlen);
+
+  int is_leak = 0; /* Small workaround */
+  int prefix_role = ROLE_UNDE;
+  if (p->cf->role == ROLE_COMP) prefix_role = rm_run(p->cf->role_map, n);
+  if (p->cf->role == ROLE_COMP && (prefix_role == ROLE_UNDE || prefix_role == ROLE_UNKN)) return;
+  eattr * eOTC_eattr = ea_find(a0->eattrs, EA_CODE(EAP_BGP, BA_eOTC));
+  if ( (p->cf->role == ROLE_PEER ||
+        p->cf->role == ROLE_PROV ||
+        prefix_role == ROLE_PEER ||
+        prefix_role == ROLE_PROV) &&
+        eOTC_eattr &&
+        p->conn->bgp->remote_as != eOTC_eattr->u.data)
+    {
+      bgp_set_attr(ea_find(a0->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, DEF_LOCAL_PREF_LEAK);
+      is_leak = 1;
+    }
+  if ( (p->cf->role == ROLE_PEER ||
+        p->cf->role == ROLE_CUST ||
+        prefix_role == ROLE_PEER ||
+        prefix_role == ROLE_CUST) &&
+        !ea_find(a0->eattrs, EA_CODE(EAP_BGP, BA_iOTC)))
+    bgp_attach_attr(&a0->eattrs, bgp_linpool, BA_iOTC, 0);
+
   /* Prepare cached route attributes */
   if (!*a)
     {
@@ -1146,8 +1172,8 @@ bgp_rte_update(struct bgp_proto *p, ip_addr prefix, int pxlen,
       a0->eattrs = ea;
     }
 
-  net *n = net_get(p->p.table, prefix, pxlen);
   rte *e = rte_get_temp(rta_clone(*a));
+  e->flags = is_leak ? REF_LEAKED : 0;
   e->net = n;
   e->pflags = 0;
   e->u.bgp.suppressed = 0;

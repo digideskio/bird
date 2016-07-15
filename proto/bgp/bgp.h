@@ -62,6 +62,7 @@ struct bgp_config {
   unsigned disable_after_error;		/* Disable the protocol when error is detected */
   int role;            			/* Your role in (i|e)BGP connection */
   int strict_mode;     			/* Are there conditions on role are set? */
+  struct role_map *role_map;
   /* Don't move any of above items below "password", because it will change
   reconfiguration logic due bgp_reconfigure() */
 
@@ -79,6 +80,7 @@ struct bgp_config {
 #define ROLE_PROV 2
 #define ROLE_CUST 3
 #define ROLE_INTE 4
+#define ROLE_COMP 5
 
 #define MLL_SELF 1
 #define MLL_DROP 2
@@ -256,6 +258,7 @@ static inline void set_next_hop(byte *b, ip_addr addr) { ((ip_addr *) b)[0] = ad
 static inline void set_next_hop(byte *b, ip_addr addr) { ((ip_addr *) b)[0] = addr; }
 #endif
 
+void bgp_set_attr(eattr *e, unsigned attr, uintptr_t val);
 void bgp_attach_attr(struct ea_list **to, struct linpool *pool, unsigned attr, uintptr_t val);
 byte *bgp_attach_attr_wa(struct ea_list **to, struct linpool *pool, unsigned attr, unsigned len);
 struct rta *bgp_decode_attrs(struct bgp_conn *conn, byte *a, uint len, struct linpool *pool, int mandatory);
@@ -321,7 +324,8 @@ void bgp_log_error(struct bgp_proto *p, u8 class, char *msg, unsigned code, unsi
 #define BA_EXT_COMMUNITY	0x10	/* [RFC4360] */
 #define BA_AS4_PATH             0x11    /* [RFC4893] */
 #define BA_AS4_AGGREGATOR       0x12
-#define BA_OTC        0x13
+#define BA_iOTC        0x13 /* [draft-ymbk-idr-bgp-open-policy] */
+#define BA_eOTC        0x14
 
 /* BGP connection states */
 

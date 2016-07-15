@@ -21,6 +21,7 @@
 #include "lib/unaligned.h"
 
 #include "bgp.h"
+#include "../../filter/filter.h"
 
 /*
  *   UPDATE message error handling
@@ -324,7 +325,9 @@ static struct attr_desc bgp_attr_table[] = {
     NULL, NULL },
   { "as4_aggregator", -1, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_OPAQUE, 1,	/* BA_AS4_PATH */
     NULL, NULL },
-  { "otc", 0, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_INT, 1,        /* BA_OTC */
+  { "iotc", 0, BAF_OPTIONAL, EAF_TYPE_INT, 0,   /*BA_iOTC*/
+    NULL, NULL },
+  { "eotc", 4, BAF_OPTIONAL | BAF_TRANSITIVE, EAF_TYPE_INT, 1,        /* BA_eOTC */
     NULL, NULL }
 };
 
@@ -342,7 +345,8 @@ bgp_alloc_adata(struct linpool *pool, unsigned len)
   return ad;
 }
 
-static void
+/* static */
+void
 bgp_set_attr(eattr *e, unsigned attr, uintptr_t val)
 {
   ASSERT(ATTR_KNOWN(attr));
@@ -1003,8 +1007,13 @@ bgp_create_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
   bgp_set_attr(ea->attrs+3, BA_LOCAL_PREF, p->cf->default_local_pref);
 
   //The simplest way to add attribute during creation
-  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) && p->conn->neighbor_role == ROLE_UNKN)
-    bgp_attach_attr(attrs, pool, BA_OTC, 0);
+  int prefix_role = ROLE_UNDE;
+  if (p->cf->role == ROLE_COMP) prefix_role = rm_run(p->cf->role_map, e->net);
+  if (p->cf->role == ROLE_PEER ||
+      p->cf->role == ROLE_PROV ||
+      prefix_role == ROLE_PEER ||
+      prefix_role == ROLE_PROV)
+    bgp_attach_attr(attrs, pool, BA_eOTC, p->local_as);
 
 
   return 0;				/* Leave decision to the filters */
@@ -1053,10 +1062,15 @@ bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
 {
   eattr *a;
 
-  if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_PROV) && p->conn->neighbor_role == ROLE_UNKN)
+  int prefix_role = ROLE_UNDE;
+  if (p->cf->role == ROLE_COMP) prefix_role = rm_run(p->cf->role_map, e->net);
+  if (p->cf->role == ROLE_PEER ||
+      p->cf->role == ROLE_PROV ||
+      prefix_role == ROLE_PEER ||
+      prefix_role == ROLE_PROV)
     {
-      a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_OTC));
-      if (!a) bgp_attach_attr(attrs, pool, BA_OTC, 0);
+      a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_eOTC));
+      if (!a) bgp_attach_attr(attrs, pool, BA_eOTC, p->local_as);
     }
 
 
@@ -1163,8 +1177,15 @@ bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *
 	return -1;
 
       /* Add default filter by role and attribute */
-      if ((p->cf->role == ROLE_PEER || p->cf->role == ROLE_CUST) &&
-           ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_OTC)))
+      int prefix_role = ROLE_UNDE;
+      if (p->cf->role == ROLE_COMP) prefix_role = rm_run(p->cf->role_map, e->net);
+      if (p->cf->role == ROLE_COMP && (prefix_role == ROLE_UNDE || prefix_role == ROLE_UNKN))
+    return -1;
+      if ( (p->cf->role == ROLE_PEER ||
+            p->cf->role == ROLE_CUST ||
+            prefix_role == ROLE_PEER ||
+            prefix_role == ROLE_CUST) &&
+              ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_iOTC)))
 	return -1;
 
       if (p->local_as == new_bgp->local_as && p->is_internal && new_bgp->is_internal)
@@ -1869,15 +1890,16 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
   if (!(seen[0] & (1 << BA_LOCAL_PREF)))
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
 
-   /* Lower in priority routes, that have already comen with BA_LOCAL_ANNOUNCE */
+   /* Lower in priority routes with eOTC */
+   eattr * eOTC_eattr = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_eOTC));
    if ((conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV) &&
-     (seen[BA_OTC / 8] & (1 << (BA_OTC % 8))))
+     eOTC_eattr && (conn->bgp->remote_as != eOTC_eattr->u.data))
          bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, DEF_LOCAL_PREF_LEAK);
 
-   /* Add local announce to routes, that haven't this attribute yet */
+   /* Add iOTC to routes*/
    if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_CUST)
-     if (!(seen[BA_OTC / 8] & (1 << (BA_OTC % 8))))
- 	   bgp_attach_attr(&a->eattrs, pool, BA_OTC, 0);
+     if (!(seen[BA_iOTC / 8] & (1 << (BA_iOTC % 8))))
+ 	   bgp_attach_attr(&a->eattrs, pool, BA_iOTC, 0);
 
 
   return a;

@@ -68,6 +68,11 @@ struct filter {
   struct f_inst *root;
 };
 
+struct role_map {
+  char *name;
+  struct f_inst *root;
+};
+
 struct f_inst *f_new_inst(void);
 struct f_inst *f_new_dynamic_attr(int type, int f_type, int code);	/* Type as core knows it, type as filters know it, and code of dynamic attribute */
 struct f_tree *f_new_tree(void);
@@ -107,6 +112,7 @@ struct ea_list;
 struct rte;
 
 int f_run(struct filter *filter, struct rte **rte, struct ea_list **tmp_attrs, struct linpool *tmp_pool, int flags);
+int rm_run(struct role_map *role_map, net *net_entry);
 struct f_val f_eval_rte(struct f_inst *expr, struct rte **rte, struct linpool *tmp_pool);
 struct f_val f_eval(struct f_inst *expr, struct linpool *tmp_pool);
 uint f_eval_int(struct f_inst *expr);
@@ -145,6 +151,7 @@ void val_format(struct f_val v, buffer *buf);
 #define T_BOOL 0x11
 #define T_PAIR 0x12  /*	Notice that pair is stored as integer: first << 16 | second */
 #define T_QUAD 0x13
+#define T_ROLE 0x14
 
 /* Put enumerational types in 0x30..0x3f range */
 #define T_ENUM_LO 0x30

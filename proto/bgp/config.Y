@@ -28,8 +28,7 @@ CF_KEYWORDS(BGP, LOCAL, NEIGHBOR, AS, HOLD, TIME, CONNECT, RETRY,
 	TABLE, GATEWAY, DIRECT, RECURSIVE, MED, TTL, SECURITY, DETERMINISTIC,
 	SECONDARY, ALLOW, BFD, ADD, PATHS, RX, TX, GRACEFUL, RESTART, AWARE,
 	CHECK, LINK, PORT, EXTENDED, MESSAGES, ROLE, PEER, PROVIDER, CUSTOMER,
-	INTERNAL, STRICT_MODE)
-
+	INTERNAL, COMPLEX, STRICT_MODE, USE)
 
 CF_GRAMMAR
 
@@ -58,6 +57,7 @@ bgp_proto_start: proto_start BGP {
      BGP_CFG->gr_time = 120;
      BGP_CFG->role = ROLE_UNDE;
      BGP_CFG->strict_mode = 0;
+     BGP_CFG->role_map = NULL;
  }
  ;
 
@@ -137,10 +137,8 @@ bgp_proto:
  | bgp_proto TTL SECURITY bool ';' { BGP_CFG->ttl_security = $4; }
  | bgp_proto CHECK LINK bool ';' { BGP_CFG->check_link = $4; }
  | bgp_proto BFD bool ';' { BGP_CFG->bfd = $3; cf_check_bfd($3); }
- | bgp_proto ROLE PEER ';' { BGP_CFG->role = ROLE_PEER; }
- | bgp_proto ROLE PROVIDER ';' { BGP_CFG->role = ROLE_PROV; }
- | bgp_proto ROLE CUSTOMER ';' { BGP_CFG->role = ROLE_CUST; }
- | bgp_proto ROLE INTERNAL ';' { BGP_CFG->role = ROLE_INTE; }
+ | bgp_proto ROLE role_name ';' { BGP_CFG->role = $3; }
+ | bgp_proto ROLE COMPLEX USE role_map ';' { BGP_CFG->role = ROLE_COMP; BGP_CFG->role_map = $5; }
  | bgp_proto STRICT_MODE ';' { BGP_CFG->strict_mode = 1; }
  ;
 

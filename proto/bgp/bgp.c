@@ -1345,6 +1345,13 @@ bgp_check_config(struct bgp_config *c)
 
   if (internal && (c->role==ROLE_PEER || c->role==ROLE_CUST || c->role==ROLE_PROV))
     cf_error("Role peer, customer and provider may be set only on external connection");
+
+  if (c->role == ROLE_COMP && c->role_map == NULL)
+    cf_error("Per prefix role map must be set for complex role");
+
+  if (c->role != ROLE_COMP && c->role_map != NULL)
+    cf_error("You cann't use role map with non complex role");
+
 }
 
 static int
@@ -1539,6 +1546,7 @@ bgp_show_proto_info(struct proto *P)
 	case ROLE_CUST: ne_role_name = "customer"; break;
 	case ROLE_PROV: ne_role_name = "provider"; break;
 	case ROLE_INTE: ne_role_name = "internal"; break;
+	case ROLE_COMP: ne_role_name = "complex" ; break;
 	case ROLE_UNDE: ne_role_name = "undefine"; break;
 	case ROLE_UNKN: ne_role_name = "unknown "; break;
       }
@@ -1557,6 +1565,7 @@ bgp_show_proto_info(struct proto *P)
 	case ROLE_CUST: role_name = "customer"; break;
 	case ROLE_PROV: role_name = "provider"; break;
 	case ROLE_INTE: role_name = "internal"; break;
+	case ROLE_COMP: role_name = "complex" ; break;
 	default:        role_name = "undefine"; break;
       }
       cli_msg(-1006, "    Session:          %s%s%s%s%s%s%s%s%s",
