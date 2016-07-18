@@ -587,7 +587,7 @@ roa_mode:
 
 
 CF_CLI_HELP(SHOW SYMBOLS, ..., [[Show all known symbolic names]])
-CF_CLI(SHOW SYMBOLS, sym_args, [table|filter|function|protocol|template|roa|<symbol>], [[Show all known symbolic names]])
+CF_CLI(SHOW SYMBOLS, sym_args, [table|filter|role_map|function|protocol|template|roa|<symbol>], [[Show all known symbolic names]])
 { cmd_show_symbols($3); } ;
 
 sym_args:
@@ -597,6 +597,7 @@ sym_args:
  | sym_args TABLE { $$ = $1; $$->type = SYM_TABLE; }
  | sym_args FUNCTION { $$ = $1; $$->type = SYM_FUNCTION; }
  | sym_args FILTER { $$ = $1; $$->type = SYM_FILTER; }
+ | sym_args ROLE_MAP { $$ = $1; $$->type = SYM_ROLE_MAP; }
  | sym_args PROTOCOL { $$ = $1; $$->type = SYM_PROTO; }
  | sym_args TEMPLATE { $$ = $1; $$->type = SYM_TEMPLATE; }
  | sym_args ROA { $$ = $1; $$->type = SYM_ROA; }

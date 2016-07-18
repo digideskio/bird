@@ -1890,16 +1890,6 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
   if (!(seen[0] & (1 << BA_LOCAL_PREF)))
     bgp_attach_attr(&a->eattrs, pool, BA_LOCAL_PREF, bgp->cf->default_local_pref);
 
-   /* Lower in priority routes with eOTC */
-   eattr * eOTC_eattr = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_eOTC));
-   if ((conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_PROV) &&
-     eOTC_eattr && (conn->bgp->remote_as != eOTC_eattr->u.data))
-         bgp_set_attr(ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_LOCAL_PREF)), BA_LOCAL_PREF, DEF_LOCAL_PREF_LEAK);
-
-   /* Add iOTC to routes*/
-   if (conn->bgp->cf->role == ROLE_PEER || conn->bgp->cf->role == ROLE_CUST)
-     if (!(seen[BA_iOTC / 8] & (1 << (BA_iOTC % 8))))
- 	   bgp_attach_attr(&a->eattrs, pool, BA_iOTC, 0);
 
 
   return a;

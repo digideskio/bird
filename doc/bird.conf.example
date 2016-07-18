@@ -167,6 +167,11 @@ protocol static {
 #	};
 #}
 
+#role_map almost_peer {
+#	if net_prefix in 203.0.113.0/24 prefix_role internal;	#(!) net_prefix instead of net 
+#	if net_prefix in [ 0.0.0.0/0+ ] prefix_role peer;
+#}
+
 
 protocol bgp {
 #	disabled;
@@ -174,10 +179,12 @@ protocol bgp {
 	local as 65000;
 	neighbor 198.51.100.130 as 64496;
 	multihop;
-        role peer;              # Set your neighbor role in bgp connection, other possible values are "provider",
-#                               # "customer", "internal"; without this option protocol doesn't allow daemon to start
-#       strict_mode;            # Turn on strict mode for role checking while establishing bgp connection; 
-#                               # default state off
+	role peer;			# Set your role in bgp connection, other possible values are 
+#					# "provider", "customer", "internal"; without this option 
+#					# protocol doesn't allow daemon to start
+#	role complex use almost_peer;	# Special syntax construction for "complex" role
+#	strict_mode;			# Turn on strict mode for role checking while establishing 
+#					# bgp connection; default state off
 #	hold time 240;
 #	startup hold time 240;
 #	connect retry time 120;
